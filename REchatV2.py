@@ -227,6 +227,8 @@ if 'persona_engagement_level' not in st.session_state:
     st.session_state.persona_engagement_level = ""
 if 'persona_attitude' not in st.session_state:
     st.session_state.persona_attitude = ""
+if 'generating_new_persona' not in st.session_state:
+    st.session_state.generating_new_persona = False
 
 # Header
 st.markdown('<div class="main-header"><h1>🕊️ Religious Persona Chatbot</h1><p>An Educational Tool for Exploring Religious Diversity</p></div>', unsafe_allow_html=True)
@@ -349,6 +351,8 @@ with col1:
     # Generate persona button
     if st.button("🎭 Create Persona", type="primary"):
         if all([religious_tradition, denomination, geographic_context, demographics]):
+            # Set generating flag to hide old description
+            st.session_state.generating_new_persona = True
             st.session_state.persona_created = True
             st.session_state.messages = []  # Clear previous messages
             
@@ -441,30 +445,52 @@ You have already been introduced to the user. Respond naturally to their questio
                             "role": "assistant", 
                             "content": f"Hi, I am {name}."
                         })
+                        
+                        # Clear generating flag
+                        st.session_state.generating_new_persona = False
                             
                     st.success("✅ Persona created successfully!")
+                    st.rerun()
                 except Exception as e:
-                    # Fallback if API fails
-                    fallback_name = demographics.split(',')[0].strip() if ',' in demographics else "The persona"
-                    fallback_desc = f"This is a {denomination} {religious_tradition} from {geographic_context}. Knowledge level: {knowledge_level}. Engagement level: {engagement_level}. Attitude: {attitude_towards_religion}."
+                    # Show detailed error to user for debugging
+                    error_msg = str(e)
+                    if "api" in error_msg.lower() or "key" in error_msg.lower() or "auth" in error_msg.lower():
+                        st.error(f"⚠️ **API Key Error:** The API key appears to be invalid or missing. Please check your API key.\n\nError details: {error_msg}")
+                    else:
+                        st.error(f"⚠️ **Could not generate AI description:** {error_msg}")
+                    
+                    # Fallback with better grammar
+                    fallback_name = demographics.split(',')[0].strip() if ',' in demographics else "a person"
+                    fallback_desc = f"This is {fallback_name}, who identifies as {denomination} within {religious_tradition}, living in {geographic_context}. Knowledge level: {knowledge_level}, Engagement level: {engagement_level}, Attitude: {attitude_towards_religion}."
                     st.session_state.persona_description_text = fallback_desc
                     st.session_state.persona_name = fallback_name
                     st.session_state.messages.append({
                         "role": "assistant", 
                         "content": f"Hi, I am {fallback_name}."
                     })
-                    st.success("✅ Persona created successfully!")
+                    
+                    # Clear generating flag
+                    st.session_state.generating_new_persona = False
+                    
+                    st.warning("⚠️ Using fallback description. Conversations may still work if API key is valid for chat responses.")
+                    st.rerun()
             else:
-                # Fallback introduction if no API key
-                fallback_name = demographics.split(',')[0].strip() if ',' in demographics else "The persona"
-                fallback_desc = f"This is a {denomination} {religious_tradition} from {geographic_context}. Knowledge level: {knowledge_level}. Engagement level: {engagement_level}. Attitude: {attitude_towards_religion}."
+                # No API key provided
+                st.warning("⚠️ No API key provided. Using fallback description.")
+                fallback_name = demographics.split(',')[0].strip() if ',' in demographics else "a person"
+                fallback_desc = f"This is {fallback_name}, who identifies as {denomination} within {religious_tradition}, living in {geographic_context}. Knowledge level: {knowledge_level}, Engagement level: {engagement_level}, Attitude: {attitude_towards_religion}."
                 st.session_state.persona_description_text = fallback_desc
                 st.session_state.persona_name = fallback_name
                 st.session_state.messages.append({
                     "role": "assistant", 
                     "content": f"Hi, I am {fallback_name}."
                 })
-                st.success("✅ Persona created successfully! (Add API key for AI-generated description)")
+                
+                # Clear generating flag
+                st.session_state.generating_new_persona = False
+                
+                st.info("💡 Add an API key in the sidebar for AI-generated persona descriptions and conversations.")
+                st.rerun()
         else:
             st.error("Please fill in all required fields (Religious Tradition, Denomination, Geographic Context, and Demographics)")
 
@@ -472,8 +498,10 @@ with col2:
     st.header("Conversation")
     
     if st.session_state.persona_created:
-        # Display persona description (if exists)
-        if 'persona_description_text' in st.session_state and st.session_state.persona_description_text:
+        # Display persona description based on generation state
+        if st.session_state.generating_new_persona:
+            st.info("⏳ Generating new persona description...")
+        elif 'persona_description_text' in st.session_state and st.session_state.persona_description_text:
             st.info(st.session_state.persona_description_text)
         
         # Create scrollable container for chat messages
